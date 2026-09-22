@@ -36,8 +36,39 @@ jobs:
 
       - name: Set Up Dependencies
         run: |
-          brew install ldid make fakeroot
-          echo "PATH=/usr/local/opt/make/libexec/gnubin:${PATH}" >> "${GITHUB_ENV}"
+          brew install ldid make
+
+          echo "/opt/homebrew/opt/make/libexec/gnubin" >> "${GITHUB_PATH}"
+
+          cat > "${RUNNER_TEMP}/theos-fakeroot" <<'EOF'
+          #!/bin/bash
+          set -e
+
+          while [[ $# -gt 0 ]]; do
+            case "$1" in
+              -c)
+                shift
+                ;;
+              -r|-p)
+                shift
+                if [[ $# -gt 0 ]]; then
+                  shift
+                fi
+                ;;
+              *)
+                break
+                ;;
+            esac
+          done
+
+          if [[ $# -eq 0 ]]; then
+            exit 0
+          fi
+
+          exec "$@"
+          EOF
+
+          chmod +x "${RUNNER_TEMP}/theos-fakeroot"
 
       - name: Install Theos
         uses: waruhachi/theos-action@v2.6.3
@@ -54,4 +85,5 @@ jobs:
           PACKAGE_SCHEME: ${{ matrix.package-scheme.value }}
         run: |
           make clean package \
+            FAKEROOT="${RUNNER_TEMP}/theos-fakeroot" \
             THEOS_PACKAGE_SCHEME="${PACKAGE_SCHEME}"
