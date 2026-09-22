@@ -49,6 +49,7 @@ jobs:
 
       - name: Build Package
         working-directory: orion
+        shell: bash
         run: |
           set -euo pipefail
 
@@ -57,7 +58,8 @@ jobs:
             STRIP=0 \
             ${{ matrix.scheme_arg }}
 
-          mkdir -p ../release
+          release_dir="$GITHUB_WORKSPACE/release"
+          mkdir -p "$release_dir"
 
           shopt -s nullglob
           debs=(packages/*.deb)
@@ -69,15 +71,16 @@ jobs:
 
           for deb in "${debs[@]}"; do
             filename="$(basename "$deb")"
-            cp "$deb" "../release/${{ matrix.scheme }}_${filename}"
+            cp "$deb" "$release_dir/${{ matrix.scheme }}_${filename}"
           done
 
-          if [ -d packages/Orion.framework ]; then
+          framework="packages/Orion.framework"
+          if [ -d "$framework" ]; then
+            zip_file="$release_dir/Orion_${{ matrix.scheme }}_framework.zip"
+
             (
               cd packages
-              zip -yr9 \
-                "../release/Orion_${{ matrix.scheme }}_framework.zip" \
-                Orion.framework
+              zip -yr9 "$zip_file" Orion.framework
             )
           fi
 
