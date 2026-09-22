@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - '*'
+
 permissions:
   contents: write
 
@@ -130,7 +131,7 @@ jobs:
             mv "release/$base" "release/$new"
           done
 
-            - name: Generate Checksums
+      - name: Generate Checksums
         id: metadata
         shell: bash
         run: |
