@@ -608,7 +608,7 @@
 				OTHER_LDFLAGS = "-weak-lsubstrate";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.theos.orion;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
-				RUN_DOCUMENTATION_COMPILER = YES;
+				RUN_DOCUMENTATION_COMPILER = NO;
 				SKIP_INSTALL = NO;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos macosx appletvsimulator appletvos watchsimulator watchos";
 				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/Sources/CydiaSubstrate";
@@ -662,7 +662,7 @@
 				OTHER_LDFLAGS = "-weak-lsubstrate";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.theos.orion;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
-				RUN_DOCUMENTATION_COMPILER = YES;
+				RUN_DOCUMENTATION_COMPILER = NO;
 				SKIP_INSTALL = NO;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos macosx appletvsimulator appletvos watchsimulator watchos";
 				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/Sources/CydiaSubstrate";
