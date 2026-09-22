@@ -6,37 +6,42 @@ jobs:
   test:
     runs-on: macos-15
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-    - name: Run tests
-      run: swift test
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Run tests
+        run: swift test
 
   build:
     strategy:
       matrix:
-        xcode-version: [ "16.4" ]
-        package-scheme: [ "", "rootless" ]
-    # match release workflow
+        xcode-version: ["16.4"]
+        package-scheme: ["", "rootless", "roothide"]
+
     runs-on: macos-15
+
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-        path: orion
-    - name: Set Up Dependencies
-      run: |
-        brew install ldid make fakeroot
-        echo "THEOS=${GITHUB_WORKSPACE}/theos" >> "${GITHUB_ENV}"
-        echo "PATH=/usr/local/opt/make/libexec/gnubin:${PATH}" >> "${GITHUB_ENV}"
-    - name: Install Theos
-      uses: actions/checkout@v4
-      with:
-        repository: theos/theos
-        path: theos
-        submodules: recursive
-    - name: Build
-      run: |
-        cd orion
-        DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode-version }}.app/Contents/Developer \
-          make THEOS_PACKAGE_SCHEME="${{ matrix.package-scheme }}"
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          path: orion
+
+      - name: Set Up Dependencies
+        run: |
+          brew install ldid make fakeroot
+          echo "THEOS=${GITHUB_WORKSPACE}/theos" >> "${GITHUB_ENV}"
+          echo "PATH=/usr/local/opt/make/libexec/gnubin:${PATH}" >> "${GITHUB_ENV}"
+
+      - name: Install Theos
+        uses: actions/checkout@v4
+        with:
+          repository: theos/theos
+          path: theos
+          submodules: recursive
+
+      - name: Build
+        run: |
+          cd orion
+          DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode-version }}.app/Contents/Developer \
+            make THEOS_PACKAGE_SCHEME="${{ matrix.package-scheme }}"
