@@ -15,9 +15,16 @@ jobs:
 
   build:
     strategy:
+      fail-fast: false
       matrix:
         xcode-version: ["16.4"]
-        package-scheme: ["", "rootless", "roothide"]
+        package-scheme:
+          - name: rootful
+            value: ""
+          - name: rootless
+            value: rootless
+          - name: roothide
+            value: roothide
 
     runs-on: macos-15
 
@@ -30,18 +37,21 @@ jobs:
       - name: Set Up Dependencies
         run: |
           brew install ldid make fakeroot
-          echo "THEOS=${GITHUB_WORKSPACE}/theos" >> "${GITHUB_ENV}"
           echo "PATH=/usr/local/opt/make/libexec/gnubin:${PATH}" >> "${GITHUB_ENV}"
 
       - name: Install Theos
-        uses: actions/checkout@v4
+        uses: waruhachi/theos-action@v2.6.3
         with:
-          repository: theos/theos
-          path: theos
-          submodules: recursive
+          theos-src: waruhachi/theos
+          theos-branch: main
+          sdks-src: waruhachi/sdks
+          sdks-branch: main
 
-      - name: Build
+      - name: Build ${{ matrix.package-scheme.name }}
+        working-directory: orion
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode-version }}.app/Contents/Developer
+          PACKAGE_SCHEME: ${{ matrix.package-scheme.value }}
         run: |
-          cd orion
-          DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode-version }}.app/Contents/Developer \
-            make THEOS_PACKAGE_SCHEME="${{ matrix.package-scheme }}"
+          make clean package \
+            THEOS_PACKAGE_SCHEME="${PACKAGE_SCHEME}"

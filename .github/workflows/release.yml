@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         xcode-version: ["16.4"]
         package-scheme:
@@ -33,11 +34,12 @@ jobs:
           echo "PATH=/usr/local/opt/make/libexec/gnubin:${PATH}" >> "${GITHUB_ENV}"
 
       - name: Install Theos
-        uses: actions/checkout@v4
+        uses: waruhachi/theos-action@v2.6.3
         with:
-          repository: theos/theos
-          path: theos
-          submodules: recursive
+          theos-src: waruhachi/theos
+          theos-branch: main
+          sdks-src: waruhachi/sdks
+          sdks-branch: main
 
       - name: Build Release
         working-directory: orion
@@ -51,29 +53,26 @@ jobs:
 
           mkdir -p ../release
 
-          deb_path="$(find packages -maxdepth 1 -type f -name '*.deb' -print -quit)"
-
-          if [ -z "${deb_path}" ]; then
-            echo "No Debian package was produced"
+          shopt -s nullglob
+          debs=(packages/*.deb)
+          if [ "${#debs[@]}" -eq 0 ]; then
+            echo "No .deb packages were produced"
             exit 1
           fi
 
-          cp "${deb_path}" \
-            "../release/Orion_${{ github.ref_name }}_${{ matrix.package-scheme.name }}.deb"
+          for deb in "${debs[@]}"; do
+            filename="$(basename "$deb")"
+            cp "$deb" "../release/${{ matrix.package-scheme.name }}_${filename}"
+          done
 
-          if [ ! -d packages/Orion.framework ]; then
-            echo "Orion.framework was not produced"
-            exit 1
+          if [ -d packages/Orion.framework ]; then
+            (
+              cd packages
+              zip -yr9 "../release/Orion_${{ matrix.package-scheme.name }}_framework.zip" Orion.framework
+            )
           fi
 
-          (
-            cd packages
-            zip -yr9 \
-              "../release/Orion_${{ github.ref_name }}_${{ matrix.package-scheme.name }}_framework.zip" \
-              Orion.framework
-          )
-
-      - name: Upload Release Packages
+      - name: Upload Release Package
         uses: actions/upload-artifact@v4
         with:
           name: orion-release-${{ matrix.package-scheme.name }}
@@ -83,7 +82,6 @@ jobs:
   release:
     needs: build
     runs-on: macos-15
-
     permissions:
       contents: write
 
