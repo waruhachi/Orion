@@ -4,22 +4,22 @@ on:
   push:
     tags:
       - '*'
+permissions:
+  contents: write
 
 jobs:
   build:
+    runs-on: macos-14
     strategy:
-      fail-fast: false
       matrix:
-        xcode-version: ["16.4"]
-        package-scheme:
-          - name: rootful
-            value: ""
-          - name: rootless
-            value: rootless
-          - name: roothide
-            value: roothide
-
-    runs-on: macos-15
+        scheme: [rootful, rootless, roothide]
+        include:
+          - scheme: rootful
+            scheme_arg: ""
+          - scheme: rootless
+            scheme_arg: "THEOS_PACKAGE_SCHEME=rootless"
+          - scheme: roothide
+            scheme_arg: "THEOS_PACKAGE_SCHEME=roothide"
 
     steps:
       - uses: actions/checkout@v4
@@ -27,42 +27,16 @@ jobs:
           submodules: true
           path: orion
 
-      - name: Set Up Dependencies
+      - name: Install Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2.0'
+
+      - name: Set up Xcode
         run: |
-          brew install ldid make
-
-          echo "THEOS=${GITHUB_WORKSPACE}/theos" >> "${GITHUB_ENV}"
-          echo "/opt/homebrew/opt/make/libexec/gnubin" >> "${GITHUB_PATH}"
-
-          cat > "${RUNNER_TEMP}/theos-fakeroot" <<'EOF'
-          #!/bin/bash
-          set -e
-
-          while [[ $# -gt 0 ]]; do
-            case "$1" in
-              -c)
-                shift
-                ;;
-              -r|-p)
-                shift
-                if [[ $# -gt 0 ]]; then
-                  shift
-                fi
-                ;;
-              *)
-                break
-                ;;
-            esac
-          done
-
-          if [[ $# -eq 0 ]]; then
-            exit 0
-          fi
-
-          exec "$@"
-          EOF
-
-          chmod +x "${RUNNER_TEMP}/theos-fakeroot"
+          xcode-select -p
+          xcodebuild -version
+          echo "DEVELOPER_DIR=$(xcode-select -p)" >> $GITHUB_ENV
 
       - name: Install Theos
         uses: waruhachi/theos-action@v2.6.3
@@ -72,21 +46,21 @@ jobs:
           sdks-src: waruhachi/sdks
           sdks-branch: main
 
-      - name: Build Release
+      - name: Build Package
         working-directory: orion
-        env:
-          DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode-version }}.app/Contents/Developer
-          PACKAGE_SCHEME: ${{ matrix.package-scheme.value }}
         run: |
+          set -euo pipefail
+
           make clean package \
-            FAKEROOT="${RUNNER_TEMP}/theos-fakeroot" \
             FINALPACKAGE=1 \
-            THEOS_PACKAGE_SCHEME="${PACKAGE_SCHEME}"
+            STRIP=0 \
+            ${{ matrix.scheme_arg }}
 
           mkdir -p ../release
 
           shopt -s nullglob
           debs=(packages/*.deb)
+
           if [ "${#debs[@]}" -eq 0 ]; then
             echo "No .deb packages were produced"
             exit 1
@@ -94,30 +68,39 @@ jobs:
 
           for deb in "${debs[@]}"; do
             filename="$(basename "$deb")"
-            cp "$deb" "../release/${{ matrix.package-scheme.name }}_${filename}"
+            cp "$deb" "../release/${{ matrix.scheme }}_${filename}"
           done
 
           if [ -d packages/Orion.framework ]; then
             (
               cd packages
-              zip -yr9 "../release/Orion_${{ matrix.package-scheme.name }}_framework.zip" Orion.framework
+              zip -yr9 \
+                "../release/Orion_${{ matrix.scheme }}_framework.zip" \
+                Orion.framework
             )
           fi
 
       - name: Upload Release Package
         uses: actions/upload-artifact@v4
         with:
-          name: orion-release-${{ matrix.package-scheme.name }}
+          name: orion-release-${{ matrix.scheme }}
           path: release/*
           if-no-files-found: error
 
   release:
     needs: build
     runs-on: macos-15
-    permissions:
-      contents: write
 
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Read package version
+        id: package_metadata
+        shell: bash
+        run: |
+          version=$(awk -F': *' '$1 == "Version" { print $2 }' control)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          
       - name: Download Release Packages
         uses: actions/download-artifact@v4
         with:
@@ -125,13 +108,109 @@ jobs:
           path: release
           merge-multiple: true
 
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Prepare release files
+        shell: bash
         run: |
-          gh release create "${{ github.ref_name }}" \
-            --verify-tag \
-            --draft \
-            --repo "${{ github.repository }}" \
-            --title "${{ github.ref_name }}" \
-            release/*
+          set -euo pipefail
+
+          shopt -s nullglob
+          files=(release/*)
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release files were downloaded"
+            exit 1
+          fi
+
+      - name: Rename DEBs to remove build number and debug
+        run: |
+          shopt -s nullglob
+          for f in release/*-*+debug_*.deb; do
+            base=$(basename "$f")
+            new=$(echo "$base" | sed -E 's/-[0-9]+\+debug/_/' | sed -E 's/__+/_/g')
+            mv "release/$base" "release/$new"
+          done
+
+            - name: Generate Checksums
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          : > release_body.md
+
+          for pkg in release/*_iphoneos-arm.deb; do
+            if [ -f "$pkg" ]; then
+              echo "### Rootful (iphoneos-arm)" >> release_body.md
+              echo "* MD5: $(md5 -q "$pkg")" >> release_body.md
+              echo "* SHA1: $(shasum -a 1 "$pkg" | awk '{ print $1 }')" >> release_body.md
+              echo "* SHA256: $(shasum -a 256 "$pkg" | awk '{ print $1 }')" >> release_body.md
+              echo "" >> release_body.md
+            fi
+          done
+
+          for pkg in release/*_iphoneos-arm64.deb; do
+            if [ -f "$pkg" ]; then
+              echo "### Rootless (iphoneos-arm64)" >> release_body.md
+              echo "* MD5: $(md5 -q "$pkg")" >> release_body.md
+              echo "* SHA1: $(shasum -a 1 "$pkg" | awk '{ print $1 }')" >> release_body.md
+              echo "* SHA256: $(shasum -a 256 "$pkg" | awk '{ print $1 }')" >> release_body.md
+              echo "" >> release_body.md
+            fi
+          done
+
+          for pkg in release/*_iphoneos-arm64e.deb; do
+            if [ -f "$pkg" ]; then
+              echo "### RootHide (iphoneos-arm64e)" >> release_body.md
+              echo "* MD5: $(md5 -q "$pkg")" >> release_body.md
+              echo "* SHA1: $(shasum -a 1 "$pkg" | awk '{ print $1 }')" >> release_body.md
+              echo "* SHA256: $(shasum -a 256 "$pkg" | awk '{ print $1 }')" >> release_body.md
+              echo "" >> release_body.md
+            fi
+          done
+
+          for pkg in release/*_framework.zip; do
+            if [ -f "$pkg" ]; then
+              case "$pkg" in
+                *rootful*)
+                  label="### Rootful Framework"
+                  ;;
+                *rootless*)
+                  label="### Rootless Framework"
+                  ;;
+                *roothide*)
+                  label="### RootHide Framework"
+                  ;;
+                *)
+                  label="### Framework"
+                  ;;
+              esac
+
+              echo "$label" >> release_body.md
+              echo "* MD5: $(md5 -q "$pkg")" >> release_body.md
+              echo "* SHA1: $(shasum -a 1 "$pkg" | awk '{ print $1 }')" >> release_body.md
+              echo "* SHA256: $(shasum -a 256 "$pkg" | awk '{ print $1 }')" >> release_body.md
+              echo "" >> release_body.md
+            fi
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.package_metadata.outputs.version }}
+          name: ${{ github.event.repository.name }} v${{ steps.package_metadata.outputs.version }}
+          body_path: release_body.md
+          files: release/*
+          draft: false
+          prerelease: false
+          make_latest: true
+
+      - name: Delete build artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: |
+            orion-release-rootful
+            orion-release-rootless
+            orion-release-roothide
+          failOnError: false
