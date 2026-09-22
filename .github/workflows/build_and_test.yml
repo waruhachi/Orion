@@ -34,7 +34,7 @@ jobs:
           submodules: true
           path: orion
 
-      - name: Set Up Dependencies
+            - name: Set Up Dependencies
         run: |
           brew install ldid make
 
@@ -46,7 +46,8 @@ jobs:
 
           while [[ $# -gt 0 ]]; do
             case "$1" in
-              -c)
+              -c|-Z)
+                # Unsupported fakeroot options on macOS.
                 shift
                 ;;
               -r|-p)
