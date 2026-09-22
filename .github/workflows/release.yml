@@ -71,12 +71,12 @@ jobs:
 
           for deb in "${debs[@]}"; do
             filename="$(basename "$deb")"
-            cp "$deb" "$release_dir/${{ matrix.scheme }}_${filename}"
+            cp "$deb" "$release_dir/${filename}"
           done
 
           framework="packages/Orion.framework"
           if [ -d "$framework" ]; then
-            zip_file="$release_dir/Orion_${{ matrix.scheme }}_framework.zip"
+            zip_file="$release_dir/${{ matrix.scheme }}_Orion.framework.zip"
 
             (
               cd packages
@@ -144,7 +144,7 @@ jobs:
 
           for pkg in release/*_iphoneos-arm.deb; do
             if [ -f "$pkg" ]; then
-              echo "### Rootful (iphoneos-arm)" >> release_body.md
+              echo "### Rootful Tweak" >> release_body.md
               echo "* MD5: $(md5 -q "$pkg")" >> release_body.md
               echo "* SHA1: $(shasum -a 1 "$pkg" | awk '{ print $1 }')" >> release_body.md
               echo "* SHA256: $(shasum -a 256 "$pkg" | awk '{ print $1 }')" >> release_body.md
@@ -154,7 +154,7 @@ jobs:
 
           for pkg in release/*_iphoneos-arm64.deb; do
             if [ -f "$pkg" ]; then
-              echo "### Rootless (iphoneos-arm64)" >> release_body.md
+              echo "### Rootless Tweak" >> release_body.md
               echo "* MD5: $(md5 -q "$pkg")" >> release_body.md
               echo "* SHA1: $(shasum -a 1 "$pkg" | awk '{ print $1 }')" >> release_body.md
               echo "* SHA256: $(shasum -a 256 "$pkg" | awk '{ print $1 }')" >> release_body.md
@@ -164,7 +164,7 @@ jobs:
 
           for pkg in release/*_iphoneos-arm64e.deb; do
             if [ -f "$pkg" ]; then
-              echo "### RootHide (iphoneos-arm64e)" >> release_body.md
+              echo "### RootHide Tweak" >> release_body.md
               echo "* MD5: $(md5 -q "$pkg")" >> release_body.md
               echo "* SHA1: $(shasum -a 1 "$pkg" | awk '{ print $1 }')" >> release_body.md
               echo "* SHA256: $(shasum -a 256 "$pkg" | awk '{ print $1 }')" >> release_body.md
