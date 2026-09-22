@@ -371,7 +371,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "[[ \"${COPY_CLI}\" == \"YES\" ]] || exit 0\n[[ \"${CONFIGURATION}\" == \"Debug\" ]] && conf=\"debug\" || conf=\"release\"\norion=\"$(swift build --package-path \"${SRCROOT}\" -c \"${conf}\" --show-bin-path)/OrionCLI\"\n\ncp \"${orion}\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/orion\"\n";
+			shellScript = "[ \"${COPY_CLI:-NO}\" = \"YES\" ] || exit 0\ncase \"${CONFIGURATION:-Debug}\" in\n    Debug) configuration=debug ;;\n    *) configuration=release ;;\nesac\nbin_path=\"$(swift build --package-path \"${SRCROOT}\" --configuration \"${configuration}\" --show-bin-path)\"\ncli=\"${bin_path}/orion\"\n[ -x \"${cli}\" ] || { echo \"error: Orion CLI was not built: ${cli}\" >&2; exit 1; }\ndestination=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"${destination}\"\ncp -f \"${cli}\" \"${destination}/orion\"\n";
 		};
 		567AF4F32536817C0056182E /* Run SwiftLint If Present */ = {
 			isa = PBXShellScriptBuildPhase;
