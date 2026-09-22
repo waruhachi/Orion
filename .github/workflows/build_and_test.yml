@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   test:
-    runs-on: macos-12
+    runs-on: macos-15
     steps:
     - uses: actions/checkout@v4
       with:
@@ -15,10 +15,10 @@ jobs:
   build:
     strategy:
       matrix:
-        xcode-version: [ "11.7", "12.4" ]
+        xcode-version: [ "16.4" ]
         package-scheme: [ "", "rootless" ]
     # match release workflow
-    runs-on: macos-11
+    runs-on: macos-15
     steps:
     - uses: actions/checkout@v4
       with:
